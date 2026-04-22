@@ -7,10 +7,20 @@ const bcrypt = require("bcrypt");
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// 🔥 CORS FIX
+app.use(cors({
+  origin: [
+    "https://treasuremc.vercel.app",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+  ]
+}));
+
 app.use(express.json());
 
-const PORT = 5000;
+// 🔥 FONTOS (Render miatt)
+const PORT = process.env.PORT || 5000;
 
 // MongoDB kapcsolat
 mongoose.connect(process.env.MONGO_URI)
@@ -33,43 +43,55 @@ app.get("/", (req, res) => {
 
 // REGISTER
 app.post("/register", async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-  const existing = await User.findOne({ email });
-  if (existing) return res.json({ message: "Email már létezik" });
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: "Email már létezik" });
 
-  const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
-  const user = new User({
-    name,
-    email,
-    password: hashed
-  });
+    const user = new User({
+      name,
+      email,
+      password: hashed
+    });
 
-  await user.save();
+    await user.save();
 
-  res.json({ message: "Sikeres regisztráció" });
+    res.json({ message: "Sikeres regisztráció" });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Szerver hiba" });
+  }
 });
 
 // LOGIN
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) return res.json({ message: "Nincs ilyen user" });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Nincs ilyen user" });
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.json({ message: "Hibás jelszó" });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(400).json({ message: "Hibás jelszó" });
 
-  res.json({
-    message: "Sikeres login",
-    user: {
-      name: user.name,
-      email: user.email
-    }
-  });
+    res.json({
+      message: "Sikeres login",
+      user: {
+        name: user.name,
+        email: user.email
+      }
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Szerver hiba" });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log("Server fut: http://localhost:5000");
+  console.log("Server fut:", PORT);
 });
